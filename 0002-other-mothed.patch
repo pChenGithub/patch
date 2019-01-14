@@ -1,0 +1,408 @@
+From 3d49b98c764a1fbea7bd060736635805ea6bd0fe Mon Sep 17 00:00:00 2001
+From: marui <892140462@qq.com>
+Date: Sat, 15 Sep 2018 22:47:04 +0800
+Subject: [PATCH 2/3] other mothed
+
+---
+ .../android/systemui/statusbar/phone/PanelBar.java |   6 +-
+ .../systemui/statusbar/phone/PhoneStatusBar.java   | 153 +++++++++++++++------
+ .../statusbar/phone/PhoneStatusBarView.java        |   8 +-
+ .../android/server/policy/PhoneWindowManager.java  |  81 +----------
+ 4 files changed, 124 insertions(+), 124 deletions(-)
+ mode change 100644 => 100755 base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+
+diff --git a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PanelBar.java b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PanelBar.java
+index 6e6088a..4c5ba2c 100644
+--- a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PanelBar.java
++++ b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PanelBar.java
+@@ -105,12 +105,12 @@ public abstract class PanelBar extends FrameLayout {
+ 
+     public PanelView selectPanelForTouch(MotionEvent touch) {
+         final int N = mPanels.size();
+-       // return mPanels.get((int)(N * touch.getX() / getMeasuredWidth()));
+-       int dropstatus = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.DROP_STATUSBAR,0);  
++        return mPanels.get((int)(N * touch.getX() / getMeasuredWidth()));
++       /*int dropstatus = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.DROP_STATUSBAR,0);  
+         if(dropstatus == 1) //add by marui 
+             return null;//modify by marui  
+         else  
+-         return mPanels.get((int)(N * touch.getX() / getMeasuredWidth()));
++         return mPanels.get((int)(N * touch.getX() / getMeasuredWidth()));*/
+     }
+ 
+     public boolean panelsEnabled() {
+diff --git a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+old mode 100644
+new mode 100755
+index ec586ad..e3575d8
+--- a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
++++ b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+@@ -161,6 +161,12 @@ import com.android.systemui.statusbar.stack.StackStateAnimator;
+ import com.android.systemui.statusbar.stack.StackViewState;
+ import com.android.systemui.volume.VolumeComponent;
+ 
++import android.view.IWindowManager;
++import android.view.WindowManagerGlobal;
++import android.view.Surface;
++import android.widget.Toast;
++
++
+ import java.io.FileDescriptor;
+ import java.io.PrintWriter;
+ import java.util.ArrayList;
+@@ -628,7 +634,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         // in session state
+ 
+         addNavigationBar();
+-
++        removeBar();
+         // Lastly, call to the icon policy to install/update all the icons.
+         mIconPolicy = new PhoneStatusBarPolicy(mContext, mCastController, mHotspotController,
+                 mUserInfoController, mBluetoothController);
+@@ -937,6 +943,13 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         filter.addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
+         filter.addAction(Intent.ACTION_SCREEN_OFF);
+         filter.addAction(Intent.ACTION_SCREEN_ON);
++//marui
++        filter.addAction(ACTION_HIDE_NAV_BAR);  
++        filter.addAction(ACTION_SHOW_NAV_BAR);  
++        filter.addAction(ACTION_SHOW_STATUS_BAR);  
++        filter.addAction(ACTION_HIDE_STATUS_BAR);  
++
++//////end//////////	   
+         context.registerReceiverAsUser(mBroadcastReceiver, UserHandle.ALL, filter, null, null);
+ 
+         IntentFilter demoFilter = new IntentFilter();
+@@ -1140,6 +1153,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         mNavigationBarView.getHomeButton().setOnTouchListener(mHomeActionListener);
+         mNavigationBarView.getHomeButton().setOnLongClickListener(mLongPressHomeListener);
+         mAssistManager.onConfigurationChanged();
++
+     }
+ 
+     // For small-screen devices (read: phones) that lack hardware navigation buttons
+@@ -1151,7 +1165,90 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+ 
+         mWindowManager.addView(mNavigationBarView, getNavigationBarLayoutParams());
+     }
++	
++//////marui	
++
++	private static final int MSG_CHANGE_BAR_HIDE_STATUS = 2030;
++	private boolean mBarIsAdd = true;
++    private void removeBar(){
++           if (mBarIsAdd)
++		   {
++                Log.d(TAG,"remove Bar");
++			    int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);  
++                if(navcheck != 0&&mNavigationBarView != null)  
++                   mWindowManager.removeView(mNavigationBarView);
++				navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);
++                if (navcheck != 0&&mStatusBarWindow != null)
++                //mWindowManager.removeView(mStatusBarWindow);
++                  mStatusBarWindow.setVisibility(View.GONE);                           
++			 mBarIsAdd = false;
++            }
++    }
++		
++	private void changeStatusBar()
++	{
++		int stacheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);
++        if (mStatusBarWindow != null)
++		{
++           if(stacheck==0)
++             mStatusBarWindow.setVisibility(View.VISIBLE);
++           else
++            mStatusBarWindow.setVisibility(View.GONE);
++         }
++	}
++	private void changeNavigationBar()
++	{
++	    int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);
++		if(navcheck == 0){ 
++               try {
++                boolean showNav = mWindowManagerService.hasNavigationBar();
++                if (DEBUG) Log.v(TAG, "hasNavigationBar=" + showNav);
++                if (showNav) {
+ 
++                mNavigationBarView =
++                    (NavigationBarView) View.inflate(mContext, R.layout.navigation_bar, null);
++
++                mNavigationBarView.setDisabledFlags(mDisabled1);
++                mNavigationBarView.setBar(this);
++                mNavigationBarView.setOnVerticalChangedListener(
++                        new NavigationBarView.OnVerticalChangedListener() {
++                    @Override
++                    public void onVerticalChanged(boolean isVertical) {
++                        if (mAssistManager != null) {
++                            mAssistManager.onConfigurationChanged();
++                        }
++                        mNotificationPanel.setQsScrimEnabled(!isVertical);
++                    }
++                });
++                mNavigationBarView.setOnTouchListener(new View.OnTouchListener() {
++                    @Override
++                    public boolean onTouch(View v, MotionEvent event) {
++                        checkUserAutohide(v, event);
++                        return false;
++                    }});
++                }
++             } catch (RemoteException ex) {
++              // no window manager? good luck with that
++               }
++             addNavigationBar();
++             if (mNavigationBarView != null)
++              {
++              setInteracting(StatusBarManager.WINDOW_STATUS_BAR, true);
++              }
++			 mBarIsAdd = true;
++		   }
++		else{
++			 if (mNavigationBarView != null)
++			     mWindowManager.removeView(mNavigationBarView);
++		   }			   
++	}
++	private void changeBarHideStatus(){
++		//removeBar(1);
++	changeStatusBar();
++	changeNavigationBar();
++	Toast.makeText(mContext, mContext.getResources().getString(R.string.status_bar_recent_remove_item_title), 3000).show();
++	}
++ ///////////////end
+     private void repositionNavigationBar() {
+         if (mNavigationBarView == null || !mNavigationBarView.isAttachedToWindow()) return;
+ 
+@@ -2112,6 +2209,9 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+                 case MSG_CLOSE_PANELS:
+                     animateCollapsePanels();
+                     break;
++				case MSG_CHANGE_BAR_HIDE_STATUS:
++                    changeBarHideStatus();
++                    break;
+                 case MSG_LAUNCH_TRANSITION_TIMEOUT:
+                     onLaunchTransitionTimeout();
+                     break;
+@@ -2825,16 +2925,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         makeStatusBarView();
+         mStatusBarWindowManager = new StatusBarWindowManager(mContext);
+         mStatusBarWindowManager.add(mStatusBarWindow, getStatusBarHeight());
+-        //add by marui  
+-        IntentFilter filter = new IntentFilter();  
+-        //filter.addAction(ACTION_HIDE_NAV_BAR);  
+-        //filter.addAction(ACTION_SHOW_NAV_BAR);  
+-        filter.addAction(ACTION_SHOW_STATUS_BAR);  
+-        filter.addAction(ACTION_HIDE_STATUS_BAR);  
+-        mContext.registerReceiver(mHideNavBarReceiver, filter);  
+-        int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);  
+-        if(navcheck != 0)  
+-           showStatusBar(false); 
++
+     }
+ 
+     // called by makeStatusbar and also by PhoneStatusBarView
+@@ -2952,6 +3043,16 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+             else if (Intent.ACTION_SCREEN_ON.equals(action)) {
+                 notifyNavigationBarScreenOn(true);
+             }
++			////////marui add
++			else if(ACTION_HIDE_NAV_BAR.equals(action)||
++			        ACTION_SHOW_NAV_BAR.equals(action)||
++					ACTION_SHOW_STATUS_BAR.equals(action)||
++					ACTION_HIDE_STATUS_BAR.equals(action))
++			{  
++			 mHandler.removeMessages(MSG_CHANGE_BAR_HIDE_STATUS);
++             mHandler.sendEmptyMessageDelayed(MSG_CHANGE_BAR_HIDE_STATUS, 400);
++            } 
++		////////marui end////////////////	
+         }
+     };
+ 
+@@ -3304,8 +3405,6 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+         mContext.unregisterReceiver(mBroadcastReceiver);
+         mContext.unregisterReceiver(mDemoReceiver);
+ 
+-        mContext.unregisterReceiver(mHideNavBarReceiver);//marui
+-
+         mAssistManager.destroy();
+ 
+         final SignalClusterView signalCluster =
+@@ -4353,31 +4452,5 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+             }
+         }
+     }
+-  //add by marui 
+-   public void showStatusBar(boolean isshow) {  
+-    if(mStatusBarWindow != null) {/* 
+-        WindowManager.LayoutParams lp = (WindowManager.LayoutParams) mStatusBarWindow.getLayoutParams(); 
+-        if(isshow) 
+-            lp.height = getStatusBarHeight(); 
+-        else 
+-            lp.height = 0; 
+-        mWindowManager.updateViewLayout(mStatusBarWindow, lp);*/  
+-        mStatusBarWindow.setVisibility(isshow ? View.VISIBLE : View.GONE);  
+-      }  
+-  }  
+-  
+-   BroadcastReceiver mHideNavBarReceiver = new BroadcastReceiver() {  
+-       @Override  
+-       public void onReceive(Context context, Intent intent) {  
+-        if(intent.getAction().equals(ACTION_HIDE_NAV_BAR)) {  
+-            //hideNavBar();  
+-        } else if(intent.getAction().equals(ACTION_SHOW_NAV_BAR)) {  
+-            //showNavBar();  
+-        } else if(intent.getAction().equals(ACTION_SHOW_STATUS_BAR)) {  
+-            showStatusBar(true);  
+-        } else if(intent.getAction().equals(ACTION_HIDE_STATUS_BAR)) {  
+-            showStatusBar(false);  
+-        }  
+-       }  
+-   }; 
++
+ }
+diff --git a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+index d8a72c0..c28093c 100644
+--- a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
++++ b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBarView.java
+@@ -107,16 +107,16 @@ private Context mContext;//add by marui
+     @Override
+     public PanelView selectPanelForTouch(MotionEvent touch) {
+         // No double swiping. If either panel is open, nothing else can be pulled down.
+-        /*return mNotificationPanel.getExpandedHeight() > 0
++        return mNotificationPanel.getExpandedHeight() > 0
+                 ? null
+-                : mNotificationPanel;*/
+-        int dropstatus = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.DROP_STATUSBAR,0);  
++                : mNotificationPanel;
++        /*int dropstatus = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.DROP_STATUSBAR,0);  
+         if(dropstatus == 1) //add by marui  
+             return null;//modify by marui  
+         else  
+            return mNotificationPanel.getExpandedHeight() > 0
+                 ? null
+-                : mNotificationPanel;
++                : mNotificationPanel;*/
+     }
+ 
+     @Override
+diff --git a/base/services/core/java/com/android/server/policy/PhoneWindowManager.java b/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
+index 25443ed..9a66a05 100755
+--- a/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/base/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -123,8 +123,6 @@ import com.android.server.LocalServices;
+ import com.android.server.policy.keyguard.KeyguardServiceDelegate;
+ import com.android.server.policy.keyguard.KeyguardServiceDelegate.DrawnListener;
+ 
+-import android.provider.Settings;  
+-import android.content.ContentResolver; 
+ 
+ import java.io.File;
+ import java.io.FileReader;
+@@ -165,13 +163,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     static final boolean ENABLE_CAR_DOCK_HOME_CAPTURE = true;
+     static final boolean ENABLE_DESK_DOCK_HOME_CAPTURE = false;
+ 
+-    public static String ACTION_SHOW_STATUS_BAR = "marui.action.show_status_bar";  
+-    public static String ACTION_HIDE_STATUS_BAR = "marui.action.hide_status_bar";
+-    public static String ACTION_HIDE_NAV_BAR = "marui.action.hide_nav_bar";  
+-    public static String ACTION_SHOW_NAV_BAR = "marui.action.show_nav_bar"; 
+-    int[] oNavigationBarHeightForRotation = new int[4];  
+-    int[] oNavigationBarWidthForRotation = new int[4];  
+-    int oStatusBarHeight;//add by marui
++
+ 
+     static final int SHORT_PRESS_POWER_NOTHING = 0;
+     static final int SHORT_PRESS_POWER_GO_TO_SLEEP = 1;
+@@ -1503,13 +1495,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         filter.addAction(Intent.ACTION_DREAMING_STOPPED);
+         context.registerReceiver(mDreamReceiver, filter);
+ 
+-       filter = new IntentFilter();
+-       filter.addAction(ACTION_SHOW_STATUS_BAR);  
+-       filter.addAction(ACTION_HIDE_STATUS_BAR);
+-       filter.addAction(ACTION_HIDE_NAV_BAR);  
+-       filter.addAction(ACTION_SHOW_NAV_BAR);
+-       context.registerReceiver(mHideNavBarReceiver, filter);  
+-
+ 
+         // register for multiuser-relevant broadcasts
+         filter = new IntentFilter(Intent.ACTION_USER_SWITCHED);
+@@ -3787,28 +3772,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 updateSystemUiVisibilityLw();
+             }
+         }
+-         //marui  
+-       int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);  
+-       if(navcheck != 0)  
+-         showStatusBar(false);
+-       navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);  
+-        if(navcheck != 0)  
+-            hideNavBar(); 
+-         //marui end
+-    }
+-
+-    public void showStatusBar(boolean isshow) {  
+-       if(isshow) {  
+-         mStatusBarHeight = oStatusBarHeight;  
+-        } else {  
+-          if(mStatusBarHeight == 0)  
+-              return;  
+-          oStatusBarHeight = mStatusBarHeight;  
+-           mStatusBarHeight = 0;  
+-        }  
+-       updateRotation(false);  
+-      }  
+-
++     }
+     /** {@inheritDoc} */
+     @Override
+     public int getSystemDecorLayerLw() {
+@@ -7134,44 +7098,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+             mKeyguardDelegate.dump(prefix, pw);
+         }
+     }
+-//add by marui  
+-public void hideNavBar() {  
+-    //Slog.d(TAG,"hideNavBar");  
+-    if((mNavigationBarHeightForRotation[mPortraitRotation] == 0)  
+-        && (mNavigationBarHeightForRotation[mUpsideDownRotation] == 0)  
+-        && (mNavigationBarHeightForRotation[mLandscapeRotation] == 0)  
+-        && (mNavigationBarHeightForRotation[mSeascapeRotation] == 0))  
+-        return;  
+-    else {  
+-        oNavigationBarHeightForRotation = mNavigationBarHeightForRotation;  
+-        oNavigationBarWidthForRotation = mNavigationBarWidthForRotation;  
+-        mNavigationBarHeightForRotation = new int[4];  
+-        mNavigationBarWidthForRotation = new int[4];  
+-    }  
+-    updateRotation(false);  
+-}  
++
+   
+-public void showNavBar() {  
+-    //Slog.d(TAG,"showNavBar");  
+-    mNavigationBarHeightForRotation = oNavigationBarHeightForRotation;  
+-    mNavigationBarWidthForRotation = oNavigationBarWidthForRotation;  
+-    updateRotation(false);  
+-}  
+-//add by marui 
+-    BroadcastReceiver mHideNavBarReceiver = new BroadcastReceiver() {  
+-        @Override  
+-        public void onReceive(Context context, Intent intent) {  
+-            if(intent.getAction().equals(ACTION_SHOW_STATUS_BAR)) {  
+-                showStatusBar(true);   
+-                //Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR, 1);  
+-            } else if(intent.getAction().equals(ACTION_HIDE_STATUS_BAR)) {  
+-                showStatusBar(false); 
+-                //Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR, 0);  
+-            }else if(intent.getAction().equals(ACTION_HIDE_NAV_BAR)) {  
+-                hideNavBar();   
+-            } else if(intent.getAction().equals(ACTION_SHOW_NAV_BAR)) {  
+-                showNavBar();  
+-            }    
+-        }  
+-    }; 
++ 
+ }
+-- 
+1.9.1
+
