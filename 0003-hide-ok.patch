@@ -1,0 +1,80 @@
+From adc7136c34dd1ab4615289462b3f08714df317b5 Mon Sep 17 00:00:00 2001
+From: marui <892140462@qq.com>
+Date: Sun, 16 Sep 2018 17:35:05 +0800
+Subject: [PATCH 3/3] hide ok
+
+---
+ .../systemui/statusbar/phone/PhoneStatusBar.java   | 29 ++++++++++++++++------
+ 1 file changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+index e3575d8..bd73c6e 100755
+--- a/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
++++ b/base/packages/SystemUI/src/com/android/systemui/statusbar/phone/PhoneStatusBar.java
+@@ -1170,15 +1170,19 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+ 
+ 	private static final int MSG_CHANGE_BAR_HIDE_STATUS = 2030;
+ 	private boolean mBarIsAdd = true;
++     private int statusflag=1,navbarflag=1;
+     private void removeBar(){
+            if (mBarIsAdd)
+ 		   {
+                 Log.d(TAG,"remove Bar");
+-			    int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);  
+-                if(navcheck != 0&&mNavigationBarView != null)  
++			    navbarflag = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);  
++                if(navbarflag != 0 && mNavigationBarView != null)  
++                  { 
+                    mWindowManager.removeView(mNavigationBarView);
+-				navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);
+-                if (navcheck != 0&&mStatusBarWindow != null)
++                   mNavigationBarView = null;
++                  }
++				statusflag = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);
++                if (statusflag != 0 && mStatusBarWindow != null)
+                 //mWindowManager.removeView(mStatusBarWindow);
+                   mStatusBarWindow.setVisibility(View.GONE);                           
+ 			 mBarIsAdd = false;
+@@ -1188,9 +1192,13 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+ 	private void changeStatusBar()
+ 	{
+ 		int stacheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_STATUSBAR,0);
++          if(stacheck == statusflag)
++            return; 
++
++          statusflag =stacheck;  
+         if (mStatusBarWindow != null)
+ 		{
+-           if(stacheck==0)
++           if(statusflag==0)
+              mStatusBarWindow.setVisibility(View.VISIBLE);
+            else
+             mStatusBarWindow.setVisibility(View.GONE);
+@@ -1199,7 +1207,11 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+ 	private void changeNavigationBar()
+ 	{
+ 	    int navcheck = Settings.Global.getInt(mContext.getContentResolver(), Settings.Global.HIDE_NAVBAR,0);
+-		if(navcheck == 0){ 
++          if(navbarflag == navcheck)
++            return; 
++
++          navbarflag =navcheck;         
++		if(navbarflag == 0){ 
+                try {
+                 boolean showNav = mWindowManagerService.hasNavigationBar();
+                 if (DEBUG) Log.v(TAG, "hasNavigationBar=" + showNav);
+@@ -1239,7 +1251,10 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
+ 		   }
+ 		else{
+ 			 if (mNavigationBarView != null)
+-			     mWindowManager.removeView(mNavigationBarView);
++			   {
++                   mWindowManager.removeView(mNavigationBarView);
++                   mNavigationBarView = null;
++                   }
+ 		   }			   
+ 	}
+ 	private void changeBarHideStatus(){
+-- 
+1.9.1
+
